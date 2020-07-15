@@ -68,6 +68,7 @@ const char* toString(Alert a)
     return Alert_Strings[a];
 }
 
+// initialize state of alert
 void initAlertState(Alert a)
 {
 #ifdef LOG_L
@@ -80,7 +81,7 @@ void initAlertState(Alert a)
     alertState[a].isPaused = FALSE;
 }
 
-// initialize state of alert
+// initialize statistics of alert
 void initStatistics(Alert a)
 {
 #ifdef LOG_L
@@ -92,6 +93,7 @@ void initStatistics(Alert a)
     alertState[a].pause = 0;
 }
 
+// initialize all state
 void startState()
 {
 #ifdef LOG_L
@@ -140,6 +142,7 @@ void printStatistics()
     }
 }
 
+// adde alerts to be sent
 void addAlert(Alert a, time_t t)
 {
 #ifdef LOG_L
@@ -158,6 +161,7 @@ void addAlert(Alert a, time_t t)
     alertState[a].t[alertState[a].e] = t;
 }
 
+// remove alerts from circular array of state
 void removeAlert(Alert a)
 {
 #ifdef LOG_L
@@ -175,6 +179,7 @@ void removeAlert(Alert a)
     }
 }
 
+// check if alert can be sent
 Status checkState(Alert a, time_t t)
 {   
     Status result;
@@ -237,6 +242,7 @@ Status checkState(Alert a, time_t t)
     return result;
 }
 
+// try to send alert
 int sendEmail(Alert a)
 {
     char currentTimeStr[128];
@@ -266,6 +272,7 @@ int sendEmail(Alert a)
     }
 }
 
+// trigger alert
 int alert(Alert a)
 {
     sendEmail(a);
@@ -300,6 +307,7 @@ void printRequirement()
     printf("PauseTime : %d sec\n\n", PauseTime);
 }
 
+// case 1: send fewer alerts than MAX_ALERTS within Period
 void testCase1()
 {
     printRequirement();
@@ -312,6 +320,7 @@ void testCase1()
     }
 }
 
+// case 2: send more alerts than MAX_ALERTS within Period
 void testCase2()
 {
     printRequirement();
@@ -324,6 +333,7 @@ void testCase2()
     }
 }
 
+// mixed case
 void testCase3()
 {
     printRequirement();
@@ -351,20 +361,15 @@ void testCase3()
 
 int main(int argc, char** argv)
 {
+    // initalize state 
     startState();
 
-    /*
-    for (int i = 0; i < 100; i++)
-    {
-        alert(ALERT_TYPE_WARNING);
-        Sleep(1000);
-    }
-    */
-
-#ifdef TEST    
-    //testCase1(); // less alerts than MAX_ALERTS within Period
+#ifndef TEST
+#error need integration with real system
+#else
+    testCase1(); // fewer alerts than MAX_ALERTS within Period
     testCase2(); // more alerts than MAX_ALERTS within Period
-    //testCase3(); // mixed case 
+    testCase3(); // mixed case 
 #endif
 
 #ifdef LOG_H
