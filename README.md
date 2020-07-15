@@ -26,9 +26,9 @@ then we want all critical alerts to be paused for 5 minutes.
 The same applies to other alert types.
 
 ## Environment
-* C Language
-* Windows OS
-* Visual Studio IDE
+* Language: C
+* OS: Windows 10 Pro
+* IDE: Microsoft Visual Studio Community 2019 
 
 ## Implementation
 The basic idea is that a kind of state machine runs with using circular array per type of alert. 
@@ -43,11 +43,11 @@ Accordingly, a kind of window of the array moves forward circularly by adding th
 SCALE is just for the test and can be set as less value than 1 for faster tests.
 
 ## Test
-3 test cases are added in the code, which shows the result log in the console as below.
+3 test cases are added in the code as below and the result logs are shown in the console.
 
 * test case 1: fewer alerts than MAX_ALERTS within Period
 * test case 2: more alerts than MAX_ALERTS within Period
-* test case 3: mixed case 
+* test case 3: mixed case
 
-An independent test case input like using file I/O seems not to be required due to its time effort.
+An independent test case input like using file I/O and automatic verification seem not to be required due to its time effort this time.
 However, an additional implementation for feeding more test cases without touching source code is highly required for commercial purposes.
