@@ -15,15 +15,16 @@
 
 
 #ifdef TEST
-#define SCALE 30 // for making test faster
+#define SCALE 1/30 // for making test faster
 #else
 #define SCALE 1
 #endif
 
 // Pause Config Options - Units in seconds
-#define PAUSE_TIME      (300/SCALE)
-#define MAX_ALERTS      5
-#define PERIOD          (60/SCALE)
+#define MAX_ALERTS 5
+const int PauseTime = 300*SCALE;
+const int Period = 60*SCALE;
+
 
 // Types of alerts
 typedef enum
@@ -55,7 +56,7 @@ typedef struct _AlertState {
     boolean isPaused;      // state of pause
     time_t t[MAX_ALERTS];  // circular array of time log 
 
-    int total, send, discard; // Statics
+    int total, send, pause; // Statics
 
 } AlertState;
 
@@ -88,7 +89,7 @@ void initStatistics(Alert a)
 
     alertState[a].total = 0;
     alertState[a].send = 0;
-    alertState[a].discard = 0;
+    alertState[a].pause = 0;
 }
 
 void startState()
@@ -131,11 +132,11 @@ void printStatistics()
     for (Alert a = 0; a < NUM_TYPE_ALERTS; a++)
     {
         
-        printf("[%s] total: %d, send: %d, discard: %d\n", 
+        printf("[%s] total: %d, send: %d, paused: %d\n", 
             toString(a), 
             alertState[a].total,
             alertState[a].send,
-            alertState[a].discard);
+            alertState[a].pause);
     }
 }
 
@@ -184,16 +185,16 @@ Status checkState(Alert a, time_t t)
         if (alertState[a].n == MAX_ALERTS)
         {
             if ((int)difftime(t, alertState[a].t[alertState[a].s]) 
-                < PERIOD)
+                < Period)
             {
 #ifdef LOG_L
-                printf("[WHY] too much %s over MAX_ALERTS(%d) in PERIOD(%d sec)\n", 
-                toString(a), MAX_ALERTS, PERIOD);
+                printf("[WHY] too much %s over MAX_ALERTS(%d) in Period(%d sec)\n", 
+                toString(a), MAX_ALERTS, Period);
 #endif
                 alertState[a].isPaused = TRUE;
-                alertState[a].discard++;
+                alertState[a].pause++;
 
-                result = MAX;  // discard Alert
+                result = MAX;  // pause Alert
             }
             else
             {
@@ -213,14 +214,14 @@ Status checkState(Alert a, time_t t)
     else
     {
         if ((int)difftime(t, alertState[a].t[alertState[a].e]) 
-            < PAUSE_TIME)
+            < PauseTime)
         {
 #ifdef LOG_L
             printf("[WHY] %s is paused for %d sec\n", toString(a),
-            PAUSE_TIME - (int)difftime(t, alertState[a].t[alertState[a].e]));
+            PauseTime - (int)difftime(t, alertState[a].t[alertState[a].e]));
 #endif
-            alertState[a].discard++;
-            result = PAUSED; // discard Alert
+            alertState[a].pause++;
+            result = PAUSED; // paused Alert
         }
         else
         {
@@ -247,13 +248,13 @@ int sendEmail(Alert a)
 
     if (checkState(a, currentTime) != OK)
     {
-        // discard Alert
+        // pause Alert
 #ifdef LOG_M
-        printf("[%s] Email discarded: %s (remain time: %d sec)\n", 
+        printf("[%s] Email paused: %s (remaining time: %d sec)\n", 
         currentTimeStr, toString(a),
-        PAUSE_TIME - (int)difftime(currentTime, alertState[a].t[alertState[a].e]));
+        PauseTime - (int)difftime(currentTime, alertState[a].t[alertState[a].e]));
 #else
-        printf("[%s] Email discarded: %s\n", currentTimeStr, toString(a));
+        printf("[%s] Email paused: %s\n", currentTimeStr, toString(a));
 #endif
         return 0; 
     }
@@ -283,7 +284,7 @@ int alerts(Alert a, int r, int d)
     int s;
     
     if (d == 0) s = 0;
-    else s = (int)(d / r);
+    else s = (int)(d / r); // caculate slepp time
 
     for (int i = 0; i < r; i++)
     {
@@ -295,31 +296,31 @@ int alerts(Alert a, int r, int d)
 void printRequirement()
 {
     printf("\nMAX_ALERTS : %d\n", MAX_ALERTS);
-    printf("PERIOD     : %d sec\n", PERIOD);
-    printf("PAUSE_TIME : %d sec\n\n", PAUSE_TIME);
+    printf("Period     : %d sec\n", Period);
+    printf("PauseTime : %d sec\n\n", PauseTime);
 }
 
 void testCase1()
 {
     printRequirement();
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 100; i++)
     {
-        alerts(ALERT_TYPE_WARNING, 1, 0);
-        alerts(ALERT_TYPE_ERROR, 1, 0);
-        alerts(ALERT_TYPE_CRITICAL, 1, 0);
-        Sleep(PERIOD * 1000 / (MAX_ALERTS - 1) );
+        alert(ALERT_TYPE_WARNING);
+        alert(ALERT_TYPE_ERROR);
+        alert(ALERT_TYPE_CRITICAL);
+        Sleep(Period * 1000 / (MAX_ALERTS - 1) );
     }
 }
 
 void testCase2()
 {
     printRequirement();
-    for (int i = 0; i < 50; i++)
+    for (int i = 0; i < 100; i++)
     {
-        alerts(ALERT_TYPE_WARNING, 1, 0);
-        alerts(ALERT_TYPE_ERROR, 1, 0);
-        alerts(ALERT_TYPE_CRITICAL, 1, 0);
-        Sleep(PERIOD * 1000 / (MAX_ALERTS + 1));
+        alert(ALERT_TYPE_WARNING);
+        alert(ALERT_TYPE_ERROR);
+        alert(ALERT_TYPE_CRITICAL);
+        Sleep(Period * 1000 / (MAX_ALERTS + 1));
     }
 }
 
@@ -328,18 +329,18 @@ void testCase3()
     printRequirement();
     for (int i = 0; i < 50; i++)
     {
-        alerts(ALERT_TYPE_WARNING, 2, PERIOD);
-        alerts(ALERT_TYPE_ERROR, 3, PERIOD);
-        alerts(ALERT_TYPE_CRITICAL, MAX_ALERTS, PERIOD);
+        alerts(ALERT_TYPE_WARNING, 2, Period);
+        alerts(ALERT_TYPE_ERROR, 3, Period);
+        alerts(ALERT_TYPE_CRITICAL, MAX_ALERTS, Period);
 
         alerts(ALERT_TYPE_WARNING, 1, 0);
         alerts(ALERT_TYPE_ERROR, 1, 0);
         alerts(ALERT_TYPE_CRITICAL, 1, 0);
 
-        Sleep(PERIOD * 1000);
-        alerts(ALERT_TYPE_WARNING, MAX_ALERTS, PERIOD);
-        alerts(ALERT_TYPE_ERROR, 3, PERIOD);
-        alerts(ALERT_TYPE_CRITICAL, 1, PERIOD);
+        Sleep(Period * 1000);
+        alerts(ALERT_TYPE_WARNING, MAX_ALERTS, Period);
+        alerts(ALERT_TYPE_ERROR, 3, Period);
+        alerts(ALERT_TYPE_CRITICAL, 1, Period);
 
         alerts(ALERT_TYPE_WARNING, 1, 0);
         alerts(ALERT_TYPE_ERROR, 1, 0);
@@ -361,10 +362,9 @@ int main(int argc, char** argv)
     */
 
 #ifdef TEST    
-    // there is no over sending within PERIOD
-    testCase1();
-    testCase2();
-    testCase3();
+    //testCase1(); // less alerts than MAX_ALERTS within Period
+    testCase2(); // more alerts than MAX_ALERTS within Period
+    //testCase3(); // mixed case 
 #endif
 
 #ifdef LOG_H
