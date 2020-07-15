@@ -48,6 +48,7 @@ SCALE is just for the test and can be set as less value than 1 for faster tests.
 * test case 1: fewer alerts than MAX_ALERTS within Period
 * test case 2: more alerts than MAX_ALERTS within Period
 * test case 3: mixed case
+* _use #define TEST_
 
 An independent test case input like using file I/O and automatic verification seem not to be required due to its time effort this time.
 However, an additional implementation for feeding more test cases without touching source code is highly required for commercial purposes.
