@@ -1,5 +1,7 @@
-﻿#ifndef _WIN32
-#error please run on Win32
+﻿#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
 #endif
 
 //#define LOG_L
@@ -8,8 +10,6 @@
 
 #define TEST
 
-//#include <unistd.h>
-#include <windows.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -22,9 +22,10 @@
 
 // Pause Config Options - Units in seconds
 #define MAX_ALERTS 5
-const int PauseTime = 300*SCALE;
-const int Period = 60*SCALE;
+const int PauseTime = 300 * SCALE;
+const int Period = 60 * SCALE;
 
+typedef enum { false, true } bool;
 
 // Types of alerts
 typedef enum
@@ -52,8 +53,10 @@ const char* Alert_Strings[] =
 
 typedef struct _AlertState {
     int s, e;              // index of circular array, t[] 
-    int n;                 // count of alert
-    boolean isPaused;      // state of pause
+    int n;
+    // count of alert
+    bool isPaused;      // state of pause
+
     time_t t[MAX_ALERTS];  // circular array of time log 
 
     int total, send, pause; // Statics
@@ -78,7 +81,7 @@ void initAlertState(Alert a)
     alertState[a].s = 0;
     alertState[a].e = 0;
     alertState[a].n = 0;
-    alertState[a].isPaused = FALSE;
+    alertState[a].isPaused = false;
 }
 
 // initialize statistics of alert
@@ -114,7 +117,11 @@ void printAlertState(Alert a)
     printf(".n : %d\n", alertState[a].n);
     for (int i = 0; i < MAX_ALERTS; i++)
     {
+#ifdef _WIN32
         printf(".t[%d]: %I64d\n", i, alertState[a].t[i]);
+#else
+        printf(".t[%d]: %ld\n", i, alertState[a].t[i]);
+#endif
     }
 }
 
@@ -133,9 +140,9 @@ void printStatistics()
     printf("\n\n\n");
     for (Alert a = 0; a < NUM_TYPE_ALERTS; a++)
     {
-        
-        printf("[%s] total: %d, send: %d, paused: %d\n", 
-            toString(a), 
+
+        printf("[%s] total: %d, send: %d, paused: %d\n",
+            toString(a),
             alertState[a].total,
             alertState[a].send,
             alertState[a].pause);
@@ -181,7 +188,7 @@ void removeAlert(Alert a)
 
 // check if alert can be sent
 Status checkState(Alert a, time_t t)
-{   
+{
     Status result;
 
     alertState[a].total++;
@@ -189,16 +196,15 @@ Status checkState(Alert a, time_t t)
     {
         if (alertState[a].n == MAX_ALERTS)
         {
-            if ((int)difftime(t, alertState[a].t[alertState[a].s]) 
+            if ((int)difftime(t, alertState[a].t[alertState[a].s])
                 < Period)
             {
 #ifdef LOG_L
-                printf("[WHY] too much %s over MAX_ALERTS(%d) in Period(%d sec)\n", 
-                toString(a), MAX_ALERTS, Period);
+                printf("[WHY] too much %s over MAX_ALERTS(%d) in Period(%d sec)\n",
+                    toString(a), MAX_ALERTS, Period);
 #endif
-                alertState[a].isPaused = TRUE;
+                alertState[a].isPaused = true;
                 alertState[a].pause++;
-
                 result = MAX;  // pause Alert
             }
             else
@@ -218,12 +224,12 @@ Status checkState(Alert a, time_t t)
     }
     else
     {
-        if ((int)difftime(t, alertState[a].t[alertState[a].e]) 
+        if ((int)difftime(t, alertState[a].t[alertState[a].e])
             < PauseTime)
         {
 #ifdef LOG_L
             printf("[WHY] %s is paused for %d sec\n", toString(a),
-            PauseTime - (int)difftime(t, alertState[a].t[alertState[a].e]));
+                PauseTime - (int)difftime(t, alertState[a].t[alertState[a].e]));
 #endif
             alertState[a].pause++;
             result = PAUSED; // paused Alert
@@ -246,23 +252,31 @@ Status checkState(Alert a, time_t t)
 int sendEmail(Alert a)
 {
     char currentTimeStr[128];
+
+
     time_t currentTime = time(NULL);
 
+#ifdef _WIN32
     struct tm CurrentTimeStructure;
     localtime_s(&CurrentTimeStructure, &currentTime);
     strftime(currentTimeStr, 128, "%Y-%m-%d %T", &CurrentTimeStructure);
+#else
+    struct tm* CurrentTimeStructure;
+    CurrentTimeStructure = localtime(&currentTime);
+    strftime(currentTimeStr, 128, "%Y-%m-%d %T", CurrentTimeStructure);
+#endif
 
     if (checkState(a, currentTime) != OK)
     {
         // pause Alert
 #ifdef LOG_M
-        printf("[%s] Email paused: %s (remaining time: %d sec)\n", 
-        currentTimeStr, toString(a),
-        PauseTime - (int)difftime(currentTime, alertState[a].t[alertState[a].e]));
-#else
+        printf("[%s] Email paused: %s (remaining time: %d sec)\n",
+            currentTimeStr, toString(a),
+            PauseTime - (int)difftime(currentTime, alertState[a].t[alertState[a].e]));
+#elif LOG_H
         printf("[%s] Email paused: %s\n", currentTimeStr, toString(a));
 #endif
-        return 0; 
+        return 0;
     }
     else
     {
@@ -289,14 +303,19 @@ int alert(Alert a)
 int alerts(Alert a, int r, int d)
 {
     int s;
-    
+
     if (d == 0) s = 0;
     else s = (int)(d / r); // caculate slepp time
 
     for (int i = 0; i < r; i++)
     {
         alert(a);
+
+#ifdef _WIN32
         Sleep(s);
+#else
+        usleep(s * 1000);
+#endif
     }
 }
 
@@ -316,7 +335,12 @@ void testCase1()
         alert(ALERT_TYPE_WARNING);
         alert(ALERT_TYPE_ERROR);
         alert(ALERT_TYPE_CRITICAL);
-        Sleep(Period * 1000 / (MAX_ALERTS - 1) );
+
+#ifdef _WIN32
+        Sleep(Period * 1000 / (MAX_ALERTS - 1));
+#else
+        usleep(Period * 1000000 / (MAX_ALERTS - 1));
+#endif
     }
 }
 
@@ -329,7 +353,11 @@ void testCase2()
         alert(ALERT_TYPE_WARNING);
         alert(ALERT_TYPE_ERROR);
         alert(ALERT_TYPE_CRITICAL);
+#ifdef _WIN32
         Sleep(Period * 1000 / (MAX_ALERTS + 1));
+#else
+        usleep(Period * 1000000 / (MAX_ALERTS + 1));
+#endif    
     }
 }
 
@@ -347,7 +375,11 @@ void testCase3()
         alerts(ALERT_TYPE_ERROR, 1, 0);
         alerts(ALERT_TYPE_CRITICAL, 1, 0);
 
+#ifdef _WIN32
         Sleep(Period * 1000);
+#else
+        usleep(Period * 1000000);
+#endif
         alerts(ALERT_TYPE_WARNING, MAX_ALERTS, Period);
         alerts(ALERT_TYPE_ERROR, 3, Period);
         alerts(ALERT_TYPE_CRITICAL, 1, Period);
