@@ -27,8 +27,8 @@ The same applies to other alert types.
 
 ## Environment
 * Language: C
-* OS: Windows 10 Pro
-* IDE: Microsoft Visual Studio Community 2019 
+* OS: Windows 10 Pro / Ubuntu
+* IDE: Microsoft Visual Studio Community 2019 / Visual Code
 
 ## Implementation
 The basic idea is that a kind of state machine runs with using circular array per type of alert. 
