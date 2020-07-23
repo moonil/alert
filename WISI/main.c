@@ -13,9 +13,8 @@
 #include <stdio.h>
 #include <time.h>
 
-
 #ifdef TEST
-#define SCALE 1/30 // for making test faster
+#define SCALE 1/60 // note: SCALE >= 1/60, for making test faster
 #else
 #define SCALE 1
 #endif
@@ -37,6 +36,9 @@ typedef enum
 } Alert;
 
 // Type of status
+// Ok mean alert can be sent 
+// PAUSED mean alert is puased
+// MAX is working as same as PASUED but it is the first time entering into the state of PASUED 
 typedef enum
 {
     OK = 0,
@@ -149,7 +151,7 @@ void printStatistics()
     }
 }
 
-// adde alerts to be sent
+// add alerts to be sent
 void addAlert(Alert a, time_t t)
 {
 #ifdef LOG_L
@@ -187,6 +189,7 @@ void removeAlert(Alert a)
 }
 
 // check if alert can be sent
+// state check happen only when new alert is tried to be sent.
 Status checkState(Alert a, time_t t)
 {
     Status result;
@@ -196,20 +199,28 @@ Status checkState(Alert a, time_t t)
     {
         if (alertState[a].n == MAX_ALERTS)
         {
+            // compare current time to oldest time in the array, [s]
             if ((int)difftime(t, alertState[a].t[alertState[a].s])
                 < Period)
             {
+                // this case is the condition to enter into the state of "Pasued"
 #ifdef LOG_L
                 printf("[WHY] too much %s over MAX_ALERTS(%d) in Period(%d sec)\n",
                     toString(a), MAX_ALERTS, Period);
 #endif
-                alertState[a].isPaused = true;
+                alertState[a].isPaused = true; // change state from OK to Max (== Paused)
                 alertState[a].pause++;
                 result = MAX;  // pause Alert
             }
             else
             {
-                removeAlert(a);
+                // there is MAX Alert in the array 
+                // but, oldest one is too old over 1 min before
+                // so, moving forward the circular array 
+                // by revoming oldest one and adding new one
+                // n is still MAX_ALERTS which mean array keep alters as many as number of MAX_ALERTS
+                // so that we can compare the time of the oldest one we sent before within number of MAX_ALERTS
+                removeAlert(a); 
                 addAlert(a, t);
                 alertState[a].send++;
                 result = OK; // send Alert
@@ -217,16 +228,20 @@ Status checkState(Alert a, time_t t)
         }
         else
         {
+            // just send alert before reaching MAX_ALERTS 
             addAlert(a, t);
             alertState[a].send++;
             result = OK; // send Alert
         }
     }
-    else
-    {
+    else 
+    {  
+        // currently Paused state.
+        // compare current time to last time in the array, [e]
         if ((int)difftime(t, alertState[a].t[alertState[a].e])
             < PauseTime)
         {
+            // PauseTime is not expired yet
 #ifdef LOG_L
             printf("[WHY] %s is paused for %d sec\n", toString(a),
                 PauseTime - (int)difftime(t, alertState[a].t[alertState[a].e]));
@@ -236,6 +251,8 @@ Status checkState(Alert a, time_t t)
         }
         else
         {
+            // PauseTime is expired
+            // so, alert can be sent as initial state
             initAlertState(a);
             addAlert(a, t);
             alertState[a].send++;
@@ -273,8 +290,10 @@ int sendEmail(Alert a)
         printf("[%s] Email paused: %s (remaining time: %d sec)\n",
             currentTimeStr, toString(a),
             PauseTime - (int)difftime(currentTime, alertState[a].t[alertState[a].e]));
-#elif LOG_H
+#else 
+#ifdef LOG_H
         printf("[%s] Email paused: %s\n", currentTimeStr, toString(a));
+#endif
 #endif
         return 0;
     }
